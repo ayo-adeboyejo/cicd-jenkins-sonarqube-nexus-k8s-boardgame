@@ -977,4 +977,4 @@ The Node Exporter Full dashboard includes pressure metrics (`node_pressure_cpu_w
 
 Let's connect!
 
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/your-profile)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/ayodejiadeboyejo/)
