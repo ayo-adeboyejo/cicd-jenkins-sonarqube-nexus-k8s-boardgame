@@ -59,7 +59,7 @@ This project was built to demonstrate practical, hands-on DevOps engineering in 
 - Implementing **observability** across infrastructure, application and CI/CD layers using Prometheus, Grafana, Blackbox Exporter and Node Exporter
 - Configuring **automated email notifications** with HTML formatting, JaCoCo coverage metrics, SonarQube links and Trivy security reports attached per build
 
-> **Note:** This project prioritises infrastructure and DevOps pipeline engineering, not application development. The Spring Boot application serves as a realistic workload to apply CI/CD practices against — the focus is entirely on the automated, secure delivery of software to production, not on the application itself.
+> **Note:** This project prioritises infrastructure and DevOps pipeline engineering, not application development. The Spring Boot application serves as a realistic workload to apply CI/CD practices against — the focus is entirely on the automated, secure delivery of software to production, not on the application itself..
 
 ---
 
