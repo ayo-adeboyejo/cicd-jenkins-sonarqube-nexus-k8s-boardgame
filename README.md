@@ -85,22 +85,29 @@ Every stage produces a traceable output — test results, coverage reports, Triv
 
 ### Server Layout
 
-All servers run on GCP virtual machines:
+All servers are provisioned on GCP virtual machines with the following naming convention:
+
+**rv** — Short form for Raven (project tag)  
+**gcp** — Server location  
+**jenk / son / nex / mon / k8** — Service abbreviation  
+**svr** — Server  
+**1 / 2 / 3** — Node number (for multi-node services)
+
 
 | Server | Role |
 |---|---|
 | `rv-gcp-jenk-svr` | Jenkins controller |
 | `rv-gcp-son-svr` | Code quality server |
 | `rv-gcp-nex-svr` | Artefact repository |
-| `rv-gcp-k8-svr1` | Kubernetes master |
-| `rv-gcp-k8-svr2` | Kubernetes worker |
-| `rv-gcp-k8-svr3` | Kubernetes worker |
+| `rv-gcp-k8-svr1` | Kubernetes master node |
+| `rv-gcp-k8-svr2` | Kubernetes worker node |
+| `rv-gcp-k8-svr3` | Kubernetes worker node |
 
 ---
 
 ### Jenkins Server Setup
 
-The following script installs Jenkins, Docker and Trivy using the official installation documentation for these tools
+The following script installs Jenkins, Docker and Trivy on the Jenkins server, following the official installation guides for each tool.
 
 ```bash
 #!/bin/bash
@@ -169,16 +176,21 @@ sudo apt update && sudo apt-get install -y trivy
 
 ### SonarQube Server Setup
 
-SonarQube runs as a container orchestrated with Docker Compose. It requires Docker to be installed before using Compose to orchestrate the container as below:
+SonarQube runs as a Docker container managed by Docker Compose. Docker was installed on the server before running the Compose file below:
 
 ```yaml
 services:
   sonarqube:
-    image: sonarqube:latest
+    image: sonarqube:community
     container_name: sonarqube
+    restart: unless-stopped
     ports:
       - "9000:9000"
-    volumes:
+    ulimits: # sonarqube requires higher file descriptor limits to run correctly
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes: # mount docker volumes for persistent storage
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_logs:/opt/sonarqube/logs
@@ -189,9 +201,11 @@ volumes:
   sonarqube_logs:
 ```
 
+Post-Installation Steps
+
 1. Access at `http://<sonarqube-ip>:9000`
-2. Default credentials: `admin / admin` — change immediately
-3. Generate an authentication token: **My Account → Security → Generate Token**
+2. Default credentials: `admin / admin`
+3. Generate an authentication token on the sonarqube server: **My Account → Security → Generate Token**
 4. Store the token in Jenkins credentials as a **Secret text** with ID `sonar-token`
 5. Configure the SonarQube server in Jenkins: **Manage Jenkins → Configure System → SonarQube servers**
 
@@ -199,31 +213,31 @@ volumes:
 
 ### Nexus Repository Setup
 
-Nexus runs as a container orchestrated with Docker Compose. It requires Docker to be installed before using Compose to orchestrate the container as below:
+Nexus runs as a Docker container managed by Docker Compose. Docker was installed on the server before running the Compose file below:
 
 ```yaml
-# Run Nexus as a Docker container
+
 services:
-   nexus:
-     image: sonatype/nexus3
-     container_name: nexus
-     ports:
-     - "8081:8081"
-     - "8082:8082"
-     volumes:
-     - nexus-data:/nexus-data
+  nexus:
+    image: sonatype/nexus3
+    container_name: nexus
+    restart: unless-stopped
+    ports:
+      - "8081:8081"    # Nexus UI and Maven repository
+    volumes:
+      - nexus-data:/nexus-data
 
 volumes:
-   nexus-data:
-
+  nexus-data:
 ```
 
+Post-Nexus Installation
 Create two hosted Maven repositories in Nexus:
 
-| Repository | Type | Purpose |
-|---|---|---|
-| `maven-releases` | hosted | Stable versioned releases — immutable |
-| `maven-snapshots` | hosted | Development builds — overwritable |
+| Repository | Type |
+|---|---|
+| `maven-releases` | hosted | 
+| `maven-snapshots` | hosted |
 
 Create a dedicated Jenkins user in Nexus with deploy permissions and store its credentials in Jenkins as a **Maven settings.xml** managed file.
 
@@ -297,6 +311,9 @@ sudo apt-mark hold kubelet kubeadm kubectl
 
 ```
 
+
+Initialise control Plane
+
 ```bash
 
 # Initialise Control plane
@@ -313,7 +330,12 @@ mkdir -p $HOME/.kube
 # Install Calico CNI 
 kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
 
-# Join worker nodes using the token from `kubeadm init` output
+```
+
+Join worker nodes to the cluster using the token from `kubeadm init` output
+
+```bash
+
 sudo kubeadm join 10.0.1.2:6443 --token <token> \
     --discovery-token-ca-cert-hash sha256:<hash>
 ```
@@ -406,8 +428,8 @@ The **Config File Provider Plugin** manages `settings.xml` inside Jenkins and ar
     <servers>
         <server>
             <id>maven-releases</id>
-            <username>jenkins</username>
-            <password>your-nexus-password</password>
+            <username>jenkins-user</username>
+            <password>jenkins-user-password</password>
         </server>
         <server>
             <id>maven-snapshots</id>
@@ -505,7 +527,7 @@ The pipeline uses **declarative syntax** with a single agent and explicit tool d
 pipeline {
     agent any
 
-    environment {
+    environment {ß
         DOCKERHUB_USER = 'aayodeji'
         DOCKERHUB_REPO = 'boardgame'
         IMAGE_TAG      = "latest"
