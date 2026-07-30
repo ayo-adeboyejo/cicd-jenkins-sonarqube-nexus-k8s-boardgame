@@ -1,36 +1,53 @@
 apiVersion: apps/v1
-kind: Deployment # Kubernetes resource kind we are creating
+kind: Deployment
 metadata:
   name: boardgame-deployment
+  namespace: boardgame
 spec:
   selector:
     matchLabels:
       app: boardgame
-  replicas: 2 # Number of replicas that will be created for this deployment
+  replicas: 2
   template:
     metadata:
       labels:
         app: boardgame
     spec:
+      # Disable automounting of service account token — fixes SonarQube
+      # security warning about automounted service account credentials
+      automountServiceAccountToken: false
       containers:
         - name: boardgame
-          image: adijaiswal/boardshack:latest # Image that will be used to containers in the cluster
+          image: "aayodeji/boardgame:IMAGE_TAG"
           imagePullPolicy: Always
           ports:
-            - containerPort: 8080 # The port that the container is running on in the cluster
-
-
+            - containerPort: 8080
+          # Resource requests and limits — fixes SonarQube reliability warnings
+          # requests: guaranteed minimum resources scheduled on the node
+          # limits: maximum resources the container can use
+          resources:
+            requests:
+              memory: "256Mi"   # minimum memory guaranteed
+              cpu: "250m"       # minimum 0.25 CPU core guaranteed
+              ephemeral-storage: "500Mi"  # minimum storage guaranteed
+            limits:
+              memory: "512Mi"   # container will be OOM killed if exceeded
+              cpu: "500m"       # container will be throttled if exceeded
+          # Security context — runs container as non-root matching Dockerfile USER
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
 ---
-
-apiVersion: v1 # Kubernetes API version
-kind: Service # Kubernetes resource kind we are creating
-metadata: # Metadata of the resource kind we are creating
-  name: boardgame-ssvc
+apiVersion: v1
+kind: Service
+metadata:
+  name: boardgame-svc
+  namespace: boardgame
 spec:
   selector:
     app: boardgame
   ports:
     - protocol: "TCP"
       port: 80
-      targetPort: 8080 
-  type: LoadBalancer # type of the service.
+      targetPort: 8080
+  type: LoadBalancer
