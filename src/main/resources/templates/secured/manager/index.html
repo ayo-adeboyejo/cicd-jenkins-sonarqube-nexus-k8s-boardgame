@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymleaf.org">
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
 
 <head th:replace="fragments/header.html :: html-head(title='Managers Secured Area')"></head>
 
@@ -9,25 +11,17 @@
         <div class="p-4 p-md-5 mb-4 text-center">
             <h1>Welcome to the Manager's Secured Area!</h1>
             <div class="container col-md-6">
-                <div class="bg-light border rounded py-3 my-3 ">
+                <div class="bg-light border rounded py-3 my-3">
                     User name: <span sec:authentication="name"></span>
                     <br>
                     Roles: <span sec:authentication="principal.authorities"></span>
                     <br><br>
                     <p class="lead">Managers Can:</p>
                     <ul class="lead">
-                        <li>
-                            Add board games to the list
-                        </li>
-                        <li>
-                            Write board game reviews
-                        </li>
-                        <li>
-                            Edit board game reviews
-                        </li>
-                        <li>
-                            Delete board game reviews
-                        </li>
+                        <li>Add board games to the list</li>
+                        <li>Write board game reviews</li>
+                        <li>Edit board game reviews</li>
+                        <li>Delete board game reviews</li>
                     </ul>
                 </div>
                 <p class="lead">Go back to the <a href="#" th:href="@{/secured}">Gateway</a></p>
@@ -39,7 +33,7 @@
         </div>
     </main>
     <div class="b-example-divider border border-light"></div>
-    <div th:include="fragments/links :: div.bottom-links"></div>
+    <div th:replace="fragments/links :: div.bottom-links"></div>
     <div th:replace="fragments/footer.html :: page-footer"></div>
 </body>
 

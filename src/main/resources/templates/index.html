@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org"
-    xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity5" data-bs-theme="light">
-
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity6"
+      data-bs-theme="light">
 
 <head th:replace="fragments/header.html :: html-head(title='Boardgame Home')"></head>
 
@@ -20,9 +21,10 @@
                 </div>
 
                 <div th:unless="${boardgames.empty}" class="py-3 my-3">
-                    <div class="list-group d-flex flex-wrap justify-content-center" th:each="boardgame : ${boardgames}">
+                    <div class="list-group d-flex flex-wrap justify-content-center"
+                         th:each="boardgame : ${boardgames}">
                         <a href="#" th:href='@{|/${boardgame.id}|}'
-                            class="list-group-item list-group-item-action py-3 my-2">
+                           class="list-group-item list-group-item-action py-3 my-2">
                             <h4 th:text="${boardgame.name}">Name</h4>
                         </a>
                     </div>
@@ -45,9 +47,9 @@
             </div>
         </div>
     </main>
-    <div class="b-example-divider border border-light"></div>
 
-    <div th:include="fragments/links :: div.bottom-links"></div>
+    <div class="b-example-divider border border-light"></div>
+    <div th:replace="fragments/links :: div.bottom-links"></div>
     <div th:replace="fragments/footer.html :: page-footer"></div>
 </body>
 

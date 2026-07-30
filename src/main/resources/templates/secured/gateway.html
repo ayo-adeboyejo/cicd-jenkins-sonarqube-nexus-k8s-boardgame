@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="https://www.thymeleaf.org"
-    xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity5">
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
 
 <head th:replace="fragments/header.html :: html-head(title='Secured Section!')"></head>
 
@@ -19,12 +20,10 @@
                 </div>
 
                 <div sec:authorize="hasRole('ROLE_USER')">
-                    <p>Go to <a href="#" th:href="@{/user}">USER secured page</a> to see user's authorities
-                    </p>
+                    <p>Go to <a href="#" th:href="@{/user}">USER secured page</a> to see user's authorities</p>
                 </div>
                 <div sec:authorize="hasRole('ROLE_MANAGER')">
-                    <p>Go to <a href="#" th:href="@{/manager}">MANAGER secured page</a> to see manager's
-                        authorities</p>
+                    <p>Go to <a href="#" th:href="@{/manager}">MANAGER secured page</a> to see manager's authorities</p>
                 </div>
 
                 <p>Go back <a href="#" th:href="@{/}">Home</a></p>
@@ -36,7 +35,7 @@
         </div>
     </main>
     <div class="b-example-divider border border-light"></div>
-    <div th:include="fragments/links :: div.bottom-links"></div>
+    <div th:replace="fragments/links :: div.bottom-links"></div>
     <div th:replace="fragments/footer.html :: page-footer"></div>
 </body>
 

@@ -1,53 +1,87 @@
+'use strict';
+
+// -------------------------------------------------------
+// Constants
+// -------------------------------------------------------
+const ROLE_USER    = 'ROLE_USER';
+const ROLE_MANAGER = 'ROLE_MANAGER';
+const ERROR_EMPTY_FIELDS  = 'User name and password are required';
+const ERROR_NO_ROLE       = 'You must select at least one role';
+const ERROR_MANAGER_ROLE  = 'To add a manager role, you should ALSO check a user role';
+
+// -------------------------------------------------------
+// Validates the new user form before submission
+// -------------------------------------------------------
 function verify() {
-    try {
-        var password = document.forms['form']['password'].value;
-        var userName = document.forms['form']['userName'].value;
-        if (password == null || password == "" || userName == null || userName == "") {
-            document.getElementById("error").innerHTML = "User name and password are required";
-            return false;
-        }
+    clearError();
 
-        var checkboxes = document.getElementsByName("authorities");
-        var okay = false;
-        var arr = [];
-        for (var i = 0; i < checkboxes.length; i++) {
-            if (checkboxes[i].checked) {
-                okay = true;
-                arr.push(checkboxes[i].value);
-                // break;
-            }
-        }
-        if (arr.length == 0) {
-            document.getElementById("error").innerHTML = "You must select at least one role";
-            okay = false;
-        } else {
-            okay = true;
-        }
+    const password = document.forms['form']['password'].value;
+    const userName = document.forms['form']['userName'].value;
 
-        var okay2 = true;
-        if (arr.includes("ROLE_MANAGER") && !arr.includes("ROLE_USER")) {
-            document.getElementById("error").innerHTML = "To add a manager role, you should ALSO check a user role";
-            okay2 = false;
-        } else {
-            okay2 = true;
-        }
-        console.log('okay1: ' + okay + " okay2: " + okay2);
-        return okay && okay2;
+    if (!password || !userName) {
+        showError(ERROR_EMPTY_FIELDS);
+        return false;
+    }
 
-    } catch (err) {
-        alert(err);
+    const selectedRoles = getSelectedRoles();
+
+    if (selectedRoles.length === 0) {
+        showError(ERROR_NO_ROLE);
+        return false;
+    }
+
+    if (selectedRoles.includes(ROLE_MANAGER) && !selectedRoles.includes(ROLE_USER)) {
+        showError(ERROR_MANAGER_ROLE);
+        return false;
+    }
+
+    return true;
+}
+
+// -------------------------------------------------------
+// Returns array of checked role values
+// -------------------------------------------------------
+function getSelectedRoles() {
+    const checkboxes = document.getElementsByName('authorities');
+    const selected = [];
+
+    for (let i = 0; i < checkboxes.length; i++) {
+        if (checkboxes[i].checked) {
+            selected.push(checkboxes[i].value);
+        }
+    }
+
+    return selected;
+}
+
+// -------------------------------------------------------
+// Displays an error message in the error element
+// -------------------------------------------------------
+function showError(message) {
+    const errorEl = document.getElementById('error');
+    if (errorEl) {
+        errorEl.innerHTML = message;
     }
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('ROLE_MANAGER').onclick = function () {
-        var userCheckbox = document.getElementById('ROLE_USER');
-        var managerCheckbox = document.getElementById('ROLE_MANAGER');
+// -------------------------------------------------------
+// Clears any existing error message
+// -------------------------------------------------------
+function clearError() {
+    showError('');
+}
 
-        if (!managerCheckbox.checked) {
-            userCheckbox.checked = false;
-        } else {
-            userCheckbox.checked = true;
-        }
+// -------------------------------------------------------
+// When ROLE_MANAGER is toggled, automatically
+// check or uncheck ROLE_USER accordingly
+// -------------------------------------------------------
+document.addEventListener('DOMContentLoaded', function () {
+    const managerCheckbox = document.getElementById(ROLE_MANAGER);
+    const userCheckbox    = document.getElementById(ROLE_USER);
+
+    if (managerCheckbox && userCheckbox) {
+        managerCheckbox.addEventListener('click', function () {
+            userCheckbox.checked = managerCheckbox.checked;
+        });
     }
 });

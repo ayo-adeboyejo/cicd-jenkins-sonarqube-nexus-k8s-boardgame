@@ -5,26 +5,46 @@
 	<parent>
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>2.5.6</version>
-		<relativePath/> <!-- lookup parent from repository -->
+		<version>2.7.18</version>
+		<relativePath/>
 	</parent>
+
 	<groupId>com.javaproject</groupId>
-	<artifactId>database_service_project</artifactId>
+	<artifactId>BoardGame</artifactId>
 	<version>0.0.5-SNAPSHOT</version>
-	<name>database_service_project</name>
+	<name>BoardGame</name>
 	<description>Project for Spring Boot</description>
 	<packaging>jar</packaging>
+
 	<properties>
 		<java.version>11</java.version>
-		<jacoco.version>0.8.7</jacoco.version>
-   		<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
-    		<sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
-    		<sonar.jacoco.reportPath>${project.basedir}/../target/jacoco.exec</sonar.jacoco.reportPath>
-    		<sonar.language>java</sonar.language>
-		
+		<maven.compiler.source>11</maven.compiler.source>
+		<maven.compiler.target>11</maven.compiler.target>
+		<lombok.version>1.18.44</lombok.version>
+		<jacoco.version>0.8.14</jacoco.version>
+
+		<!-- SonarQube — analyse Java AND resources (HTML/JS/CSS) for quality -->
+		<!-- Coverage metric restricted to Java only via sonar.coverage.exclusions -->
+		<sonar.sources>src/main/java,src/main/resources</sonar.sources>
+		<sonar.tests>src/test/java</sonar.tests>
+		<sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+		<sonar.dynamicAnalysis>reuseReports</sonar.dynamicAnalysis>
+		<sonar.language>java</sonar.language>
+
+		<!-- Correct property for SonarQube 9+ pointing to XML report -->
+		<sonar.coverage.jacoco.xmlReportPaths>
+			${project.basedir}/target/site/jacoco/jacoco.xml
+		</sonar.coverage.jacoco.xmlReportPaths>
+
+		<!-- Exclude non-Java files from COVERAGE metric only -->
+		<!-- HTML/JS/CSS/SQL still analysed for quality issues -->
+		<sonar.coverage.exclusions>
+			src/main/resources/**
+		</sonar.coverage.exclusions>
 	</properties>
 
 	<dependencies>
+
 		<dependency>
 			<groupId>org.thymeleaf.extras</groupId>
 			<artifactId>thymeleaf-extras-springsecurity5</artifactId>
@@ -33,7 +53,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-security</artifactId>
 		</dependency>
-
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jdbc</artifactId>
@@ -52,14 +71,18 @@
 			<scope>runtime</scope>
 		</dependency>
 		<dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
-        </dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<!-- Lombok — Java 25 compatible -->
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
+			<version>${lombok.version}</version>
 			<optional>true</optional>
 		</dependency>
+
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
@@ -71,15 +94,30 @@
 			<scope>test</scope>
 		</dependency>
 
-		<dependency>
-    <groupId>org.jacoco</groupId> 
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <version>0.8.7</version>
-</dependency>
 	</dependencies>
 
 	<build>
 		<plugins>
+
+			<!-- Compiler plugin — Lombok annotation processor -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.12.0</version>
+				<configuration>
+					<source>${java.version}</source>
+					<target>${java.version}</target>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.projectlombok</groupId>
+							<artifactId>lombok</artifactId>
+							<version>${lombok.version}</version>
+						</path>
+					</annotationProcessorPaths>
+				</configuration>
+			</plugin>
+
+			<!-- Spring Boot plugin — excludes Lombok from final JAR -->
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
@@ -93,42 +131,40 @@
 				</configuration>
 			</plugin>
 
+			<!-- JaCoCo 0.8.14 — Java 25 official support -->
 			<plugin>
-    <groupId>org.jacoco</groupId>
-    <artifactId>jacoco-maven-plugin</artifactId>
-    <version>${jacoco.version}</version>
-    <executions>
-        <execution>
-            <id>jacoco-initialize</id>
-            <goals>
-                <goal>prepare-agent</goal>
-            </goals>
-        </execution>
-        <execution>
-            <id>jacoco-site</id>
-            <phase>package</phase>
-            <goals>
-                <goal>report</goal>
-            </goals>
-        </execution>
-    </executions>
-</plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.version}</version>
+				<executions>
+					<execution>
+						<id>jacoco-initialize</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>jacoco-site</id>
+						<phase>package</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
 		</plugins>
 	</build>
 
-
- <distributionManagement>
-  <repository>
-    <id>maven-releases</id>
-    <url>http://13.127.177.61:8081/repository/maven-releases/</url>
-  </repository>
-  <snapshotRepository>
-    <id>maven-snapshots</id>
-    <url>http://13.127.177.61:8081/repository/maven-snapshots/</url>
-  </snapshotRepository>
-</distributionManagement>
-
-
-	
+	<distributionManagement>
+		<repository>
+			<id>maven-releases</id>
+			<url>http://34.75.47.149:8081/repository/maven-releases/</url>
+		</repository>
+		<snapshotRepository>
+			<id>maven-snapshots</id>
+			<url>http://34.75.47.149:8081/repository/maven-snapshots/</url>
+		</snapshotRepository>
+	</distributionManagement>
 
 </project>

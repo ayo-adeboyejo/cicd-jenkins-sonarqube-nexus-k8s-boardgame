@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="https://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
 
 <head th:replace="fragments/header.html :: html-head(title='Boardgame Reviews')"></head>
 
@@ -26,22 +28,23 @@
                             <td th:text="${review.text}">Review Text</td>
                             <td>
                                 <a sec:authorize="hasRole('ROLE_MANAGER')" href="#"
-                                    th:href="@{|/${boardgame.id}/reviews/${review.id}|}">Edit</a>
-                                <p sec:authorize="!hasRole('ROLE_MANAGER')" title="Manager Role required"
-                                    class="text-secondary">Edit
-                                </p>
+                                   th:href="@{|/${boardgame.id}/reviews/${review.id}|}">Edit</a>
+                                <p sec:authorize="!hasRole('ROLE_MANAGER')"
+                                   title="Manager Role required"
+                                   class="text-secondary">Edit</p>
                             </td>
                             <td>
                                 <a sec:authorize="hasRole('ROLE_MANAGER')" href="#"
-                                    th:href="@{/deleteReview/}+${review.id}">Delete</a>
-                                <p sec:authorize="!hasRole('ROLE_MANAGER')" title="Manager Role required"
-                                    class="text-secondary">
-                                    Delete</p>
+                                   th:href="@{/deleteReview/}+${review.id}">Delete</a>
+                                <p sec:authorize="!hasRole('ROLE_MANAGER')"
+                                   title="Manager Role required"
+                                   class="text-secondary">Delete</p>
                             </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
+
             <div sec:authorize="!hasRole('ROLE_MANAGER')" th:if="${reviews}">
                 <p class="lead">** Only the users with manager role can edit/ delete the reviews **</p>
             </div>
@@ -57,7 +60,7 @@
         </div>
     </main>
     <div class="b-example-divider border border-light"></div>
-    <div th:include="fragments/links :: div.bottom-links"></div>
+    <div th:replace="fragments/links :: div.bottom-links"></div>
     <div th:replace="fragments/footer.html :: page-footer"></div>
 </body>
 
