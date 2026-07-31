@@ -798,23 +798,23 @@ The pipeline is complemented by a monitoring stack that provides observability a
 
 ### What Is Monitored
 
-**Infrastructure — Node Exporter:**
-- CPU usage per core, memory and swap utilisation
-- Disk read/write throughput and filesystem usage
-- Network bytes in/out per interface
-- System load average and uptime
+1. **Infrastructure — Node Exporter scrapes metrics from Jenkins server:**
+   - CPU usage per core, memory and swap utilisation
+   - Disk read/write throughput and filesystem usage
+   - Network bytes in/out per interface
+   - System load average and uptime
 
-**Application — Blackbox Exporter:**
-- BoardGame application uptime on Kubernetes
-- HTTP status code and end-to-end response time
-- HTTP duration breakdown — DNS lookup, TCP connect, processing, transfer
-- SSL certificate validity and expiry (for HTTPS targets)
+2. **Application — Blackbox Exporter:**
+   - BoardGame application uptime on Kubernetes
+   - HTTP status code and end-to-end response time
+   - HTTP duration breakdown — DNS lookup, TCP connect, processing, transfer
+   - SSL certificate validity and expiry (for HTTPS targets)
 
-**CI/CD — Jenkins metrics:**
-- Build queue depth and executor utilisation
-- Build counts and durations exposed at `/prometheus`
+3. **CI/CD — Jenkins Prometheus plugin monitors the Job:**
+   - Build queue depth and executor utilisation
+   - Build counts and durations exposed at `/prometheus`
 
-### Docker Compose Setup
+### Docker Compose Setup for BlackBox exporter, Prometheus and Grafana
 
 ```yaml
 services:
@@ -853,11 +853,29 @@ volumes:
   grafana-data:
 ```
 
-Node Exporter runs on the Jenkins server with `network_mode: host` and `pid: host` to access real host-level metrics rather than the container's isolated view.
+### Node Exporter Set up Jenkins Host
+Node Exporter runs on the Jenkins server, manage by docker compose with `network_mode: host` and `pid: host` to access real host-level metrics rather than the container's isolated view.
+
+```yaml
+services:
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.pressure'
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    volumes:
+      - '/:/host:ro,rslave'
+```
 
 ### Boot Persistence
 
-A systemd service unit ensures the monitoring stack starts automatically after server reboot:
+Two systemd service units ensure the monitoring stack and the node-exporter services start automatically in the event of server reboot:
+
+**Systemd unit file for monitoring stack on the Monitor Server**
 
 ```ini
 [Unit]
@@ -884,6 +902,41 @@ WantedBy=multi-user.target
 sudo systemctl enable monitoring.service
 sudo systemctl start monitoring.service
 ```
+
+
+**Systemd unit file for node-exporter service on Jenkins host**
+
+```ini
+
+[Unit]
+Description=Node Exporter
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/home/jenkins_adm/compose-files/node-exporter/
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=300
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+
+```
+
+```bash
+sudo systemctl enable node-exporter.service
+sudo systemctl start node-exporter.service
+```
+
+
+---
+
 ### Grafana Dashboards
 
 Two pre-built dashboards are imported from Grafana's public registry:
