@@ -903,6 +903,10 @@ sudo systemctl enable monitoring.service
 sudo systemctl start monitoring.service
 ```
 
+** monitoring service started successfully**
+![project-block-diagram](./screenshots/monitoring-stack.jpg)
+
+
 
 **Systemd unit file for node-exporter service on Jenkins host**
 
