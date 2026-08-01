@@ -249,6 +249,78 @@ sudo kubeadm join 10.0.1.2:6443 --token <token> \
 ```
 
 ---
+## Kubernetes RBAC for Jenkins
+
+Jenkins deploys using a dedicated service account with **least-privilege** permissions scoped exclusively to the `boardgame` namespace. It cannot affect any other namespace or cluster-level resources.
+
+```yaml
+# jenkins-rbac.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: boardgame
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins
+  namespace: boardgame
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-deployer
+  namespace: boardgame
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "pods/exec", "services",
+                "configmaps", "secrets", "serviceaccounts", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer-binding
+  namespace: boardgame
+subjects:
+  - kind: ServiceAccount
+    name: jenkins
+    namespace: boardgame
+roleRef:
+  kind: Role
+  name: jenkins-deployer
+  apiGroup: rbac.authorization.k8s.io
+```
+
+```bash
+# Apply RBAC manifest
+kubectl apply -f jenkins-rbac.yaml
+
+# Create long-lived token for the service account
+# (Kubernetes 1.24+ no longer auto-generates tokens)
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jenkins-deployer-token
+  namespace: boardgame
+  annotations:
+    kubernetes.io/service-account.name: jenkins
+type: kubernetes.io/service-account-token
+EOF
+
+# Retrieve the token and store in Jenkins credentials
+kubectl get secret jenkins-deployer-token \
+    --namespace boardgame \
+    -o jsonpath='{.data.token}' | base64 --decode
+```
+---
 
 ### Jenkins Server Setup
 
@@ -423,79 +495,6 @@ The **Config File Provider Plugin** manages `settings.xml` inside Jenkins. Maven
 
 The `id` values must match the `<id>` in `pom.xml` `distributionManagement`. The ID is how Maven knows which credentials to use for which Nexus repository.
 
----
-
-## Kubernetes RBAC for Jenkins
-
-Jenkins deploys using a dedicated service account with **least-privilege** permissions scoped exclusively to the `boardgame` namespace. It cannot affect any other namespace or cluster-level resources.
-
-```yaml
-# jenkins-rbac.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: boardgame
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: jenkins
-  namespace: boardgame
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: jenkins-deployer
-  namespace: boardgame
-rules:
-  - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets", "statefulsets"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: [""]
-    resources: ["pods", "pods/log", "pods/exec", "services",
-                "configmaps", "secrets", "serviceaccounts", "events"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: jenkins-deployer-binding
-  namespace: boardgame
-subjects:
-  - kind: ServiceAccount
-    name: jenkins
-    namespace: boardgame
-roleRef:
-  kind: Role
-  name: jenkins-deployer
-  apiGroup: rbac.authorization.k8s.io
-```
-
-```bash
-# Apply RBAC manifest
-kubectl apply -f jenkins-rbac.yaml
-
-# Create long-lived token for the service account
-# (Kubernetes 1.24+ no longer auto-generates tokens)
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: jenkins-deployer-token
-  namespace: boardgame
-  annotations:
-    kubernetes.io/service-account.name: jenkins
-type: kubernetes.io/service-account-token
-EOF
-
-# Retrieve the token and store in Jenkins credentials
-kubectl get secret jenkins-deployer-token \
-    --namespace boardgame \
-    -o jsonpath='{.data.token}' | base64 --decode
-```
 
 ---
 
