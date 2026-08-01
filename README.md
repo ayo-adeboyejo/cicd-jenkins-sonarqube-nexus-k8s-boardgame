@@ -136,13 +136,9 @@ volumes:
   sonarqube_logs:
 ```
 
-**Post-installation steps:**
+**SonarQube post-installation steps:**
 
-1. Access at `http://<sonarqube-ip>:9000`
-2. Default credentials: `admin / admin` — change immediately
-3. Generate an authentication token: **My Account → Security → Generate Token**
-4. Store the token in Jenkins credentials as a **Secret text** with ID `sonar-token`
-5. Configure the SonarQube server in Jenkins: **Manage Jenkins → Configure System → SonarQube servers**
+1. An authentication token was generated for Jenkins user : **My Account → Security → Generate Token**
 
 ---
 
@@ -165,16 +161,14 @@ volumes:
   nexus-data:
 ```
 
-**Post-installation steps:**
+**Nexus Post-installation steps:**
 
-Create two hosted Maven repositories in Nexus:
+* Two hosted maven repositories were created in Nexus to store the artefacts
 
-| Repository | Type | Purpose |
-|---|---|---|
-| `maven-releases` | hosted | Stable versioned releases — immutable once published |
-| `maven-snapshots` | hosted | Development builds — overwritable |
 
-Create a dedicated Jenkins user in Nexus with deploy permissions and store its credentials in Jenkins as a **Maven settings.xml** managed file.
+* A dedicated Jenkins user was created in Nexus with deploy permissions.
+
+![Jenskins Nexus User Created](./screenshots/jenkins-nexus-user.png)
 
 ---
 
@@ -353,7 +347,26 @@ Go to **Manage Jenkins → Global Tool Configuration**:
 | NodeJS | `nodejs` | 24.x LTS | `tools { nodejs 'nodejs' }` |
 | SonarQube Scanner | `sonar-scanner` | Latest | `SCANNER_HOME = tool 'sonar-scanner'` |
 
+![Tools config](./screenshots/tools-configuration.png)
+
 > The `tools` block adds the tool's `bin/` directory to `PATH` — enabling `mvn`, `java`, and `node` commands directly. The `tool()` function returns the full installation path — used for SonarQube Scanner which is invoked via `$SCANNER_HOME/bin/sonar-scanner`.
+
+---
+
+### Credentials
+
+Credentials are required for Jenkins to authenticate with the different servers and services referenced in the pipeline.
+They are configured at **Manage Jenkins → Credentials → Global → Add Credentials**.:
+
+| ID | Kind | Used in pipeline |
+|---|---|---|
+| `docker-cred` | Username with password | `withCredentials` in Build Docker Image stage |
+| `git-cred` | Username with password | GitHun authentication |
+| `k8-cred` | Secret text | `withKubeConfig` in Deploy to Kubernetes stage |
+| `sonar-token` | Secret text | SonarQube server configuration |
+| `mail-cred` | Username with password | Gmail app credentials |
+
+![Credentials](./screenshots/credentials-config.png)
 
 ---
 
@@ -361,7 +374,7 @@ Go to **Manage Jenkins → Global Tool Configuration**:
 
 The SonarQube server must be registered in Jenkins before `withSonarQubeEnv()` can be used in the pipeline. SonarQube must already be running and its token generated before this step.
 
-Go to **Manage Jenkins → Configure System**:
+This is configured at **Manage Jenkins → Configure System**:
 
 1. Scroll to the **SonarQube servers** section
 2. Check **Environment variables** — enables `withSonarQubeEnv()` in the pipeline
@@ -375,26 +388,16 @@ Go to **Manage Jenkins → Configure System**:
 
 4. Click **Save**
 
-> The **Name** field is case sensitive and must match exactly what is passed to `withSonarQubeEnv()` in the Jenkinsfile. A mismatch causes the pipeline to fail with `SonarQube server not found`.
+> The **Name** field is case sensitive and must match exactly what is passed to `withSonarQubeEnv()` in the Jenkinsfile.
 
----
 
-### Credentials
-
-Go to **Manage Jenkins → Credentials → Global → Add Credentials**:
-
-| ID | Kind | Used in pipeline |
-|---|---|---|
-| `docker-cred` | Username with password | `withCredentials` in Build Docker Image stage |
-| `k8-cred` | Secret text | `withKubeConfig` in Deploy to Kubernetes stage |
-| `sonar-token` | Secret text | SonarQube server configuration |
-| `global-settings` | Maven settings.xml | `withMaven` in Publish Artefact stage |
 
 ---
 
 ### Managed Files
 
-The **Config File Provider Plugin** manages `settings.xml` inside Jenkins so Nexus credentials are never committed to version control:
+The **Config File Provider Plugin** manages `settings.xml` inside Jenkins. Maven uses `settings.xml` to store authentication credentials that `pom.xml` cannot hold securely. By managing `settings.xml` through Jenkins, Nexus credentials are kept out of the repository entirely and injected securely at build time.
+
 
 1. Go to **Manage Jenkins → Managed Files → Add a New Config**
 2. Select **Maven settings.xml**
@@ -406,19 +409,19 @@ The **Config File Provider Plugin** manages `settings.xml` inside Jenkins so Nex
     <servers>
         <server>
             <id>maven-releases</id>
-            <username>jenkins</username>
-            <password>your-nexus-password</password>
+            <username>jenkins-nexus-user</username>
+            <password>enter-password</password>
         </server>
         <server>
             <id>maven-snapshots</id>
-            <username>jenkins</username>
-            <password>your-nexus-password</password>
+            <username>jenkins-nexus-user</username>
+            <password>enter-password</password>
         </server>
     </servers>
 </settings>
 ```
 
-The `id` values must match the `<id>` in `pom.xml` `distributionManagement` — this is how Maven knows which credentials to use for which Nexus repository.
+The `id` values must match the `<id>` in `pom.xml` `distributionManagement`. The ID is how Maven knows which credentials to use for which Nexus repository.
 
 ---
 
@@ -683,28 +686,27 @@ pipeline {
 
 ## Code Quality and Coverage
 
-SonarQube analyses the project on two dimensions simultaneously — **code quality** across all source types, and **test coverage** restricted to Java only.
+SonarQube analyses the project on two dimensions simultaneously: **code quality** across all source types, and **test coverage** restricted to Java only.
 
 ```
 src/main/java        → quality analysis + coverage measurement
-src/main/resources   → quality analysis only (HTML accessibility, JS issues)
+src/main/resources   → quality analysis only
 src/test/java        → test source — not analysed for quality
 ```
 
 This separation is critical. Without it, HTML, CSS and SQL files with no coverage data drag the overall coverage metric down from the true Java figure, creating a false picture of test quality.
 
-**Coverage results:**
+**Code Quality result from SonarQube**
 
-| Package | Line Coverage | Branch Coverage |
-|---|---|---|
-| `com.javaproject.controllers` | 90% | 75% |
-| `com.javaproject.security` | 90% | 0%* |
-| `com.javaproject.database` | 96% | 80% |
-| **Overall** | **91%** | **70%** |
+![Quality result from SonarQube](./screenshots/code-quality-report.png)
 
-*Security branch coverage is 0% because triggering a real 403 access denied event in tests requires additional MockMvc security configuration beyond the current test suite.
+**Test Coverage result from JaCoCo**
 
-The JaCoCo HTML report is published directly to the Jenkins build page via `publishHTML` — accessible at **Build → JaCoCo Coverage Report** without needing server access.
+![JaCoCo coverage result](./screenshots/jacoco-coverage-report.png)
+
+> Security branch coverage is 0% because triggering a real 403 access denied event in tests requires additional MockMvc security configuration beyond the current test suite.
+
+The JaCoCo HTML report is published directly to the Jenkins build page via `publishHTML` and accessible at **Build → JaCoCo Coverage Report**.
 
 ---
 
@@ -712,9 +714,13 @@ The JaCoCo HTML report is published directly to the Jenkins build page via `publ
 
 Trivy runs at two points in the pipeline:
 
-**Filesystem scan** — runs before packaging, scanning source code and `pom.xml` for known CVEs in declared dependencies. Output saved to `reports/trivy-fs-report.html`.
+* **Filesystem scan** : This runs before packaging and it scans the source code and `pom.xml` for known CVEs in declared dependencies. Output saved to `reports/trivy-fs-report.html`.
 
-**Image scan** — runs after the Docker image is built, scanning OS packages and library layers for vulnerabilities. This catches issues introduced by the base image that the filesystem scan cannot see. Output saved to `reports/trivy-image-report.html`.
+![Trivy File System Scan Report](./screenshots/trivy-fs-scan-report.png)
+
+* **Image scan** runs after the Docker image is built, scanning OS packages and library layers for vulnerabilities. This catches issues introduced by the base image that the filesystem scan cannot see. Output saved to `reports/trivy-image-report.html`.
+
+![Trivy Image Scan Report](./screenshots/trivy-image-scan-report.png)
 
 Both reports are archived as Jenkins build artefacts and available for download from the build page. The `reports/` directory is explicitly separated from source code to prevent SonarQube from treating Trivy HTML output as analysable source files.
 
@@ -725,13 +731,14 @@ Both reports are archived as Jenkins build artefacts and available for download 
 Maven's `deploy` lifecycle phase pushes the built JAR to Nexus using coordinates from `pom.xml`:
 
 ```
-com.javaproject:database_service_project:0.0.5-SNAPSHOT
+com.javaproject:BoardGame:0.0.5-SNAPSHOT
 ```
 
 The `-SNAPSHOT` suffix routes to `maven-snapshots`. Removing it and changing to a fixed version number (e.g. `0.0.5`) routes to `maven-releases` — which is immutable. Once a release version is published it cannot be overwritten, providing an auditable history of every production build.
 
-The `withMaven()` step with `traceability: true` attaches Jenkins build metadata to the Nexus artefact — build number, Git commit hash, and branch name — so any artefact in Nexus can be traced back to the exact pipeline run and source commit that produced it.
+The `withMaven()` step with `traceability: true` attaches Jenkins build metadata to the Nexus artefact; build number, Git commit hash, and branch name. This ensures that any artefact in Nexus can be traced back to the exact pipeline run and source commit that produced it.
 
+![Artefact in nexus](./screenshots/artefacts-in-nexus.png)
 ---
 
 ## Container Strategy
@@ -943,13 +950,14 @@ sudo systemctl start node-exporter.service
 
 ### Grafana Dashboards
 
-Two pre-built dashboards are imported from Grafana's public registry:
+_**Jenskins Host Resource Usage**_
 
-| Dashboard | What it shows |
-|---|---|
-| Node Exporter Full | CPU, memory, disk, network and filesystem metrics for the Jenkins server |
-| Prometheus Blackbox Exporter | Uptime, response time breakdown, HTTP status and SLA metrics for the BoardGame application |
+![Jenskins Host Resource Usage](./screenshots/jenkins-host-dashboard.png)
 
+---
+_**Live Website Monitor**_
+
+![Live Website Dashboard](./screenshots/website-blackbox-dashboard.png)
 ---
 
 ## Email Notifications
