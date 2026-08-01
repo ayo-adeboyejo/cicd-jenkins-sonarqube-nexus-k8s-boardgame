@@ -11,37 +11,42 @@
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-
 A Jenkins CI/CD pipeline built on GCP infrastructure. It covers automated testing, static code analysis, security scanning, artefact management, containerisation, Kubernetes deployment and full-stack observability.
 
-
-![project-block-diagram](./screenshots/project-block-diagram.png)
+![project-block-diagram](screenshots/project-block-diagram.png)
 
 ---
+
 ## Table of Contents
 
 - [Learning Objectives](#learning-objectives)
 - [Pipeline Overview](#pipeline-overview)
 - [Infrastructure Setup](#infrastructure-setup)
   - [GCP Networking](#gcp-networking)
-  - [Server Layout](#server-layout)
+  - [Server Overview](#server-overview)
   - [SonarQube Server Setup](#sonarqube-server-setup)
   - [Nexus Repository Setup](#nexus-repository-setup)
   - [Kubernetes Cluster Setup](#kubernetes-cluster-setup)
+    - [Kubernetes RBAC for Jenkins](#kubernetes-rbac-for-jenkins)
   - [Jenkins Server Setup](#jenkins-server-setup)
 - [Jenkins Configuration](#jenkins-configuration)
   - [Required Plugins](#required-plugins)
   - [Global Tool Configuration](#global-tool-configuration)
-  - [System Configuration](#system-configuration)
+  - [SonarQube Integration](#sonarqube-integration)
   - [Credentials](#credentials)
-  - [Managed Files](#managed-files)
-- [Kubernetes RBAC for Jenkins](#kubernetes-rbac-for-jenkins)
-- [Jenkinsfile Walkthrough](#jenkinsfile-walkthrough)
+  - [Nexus Authentication](#nexus-authentication)
+- [Pipeline Configuration](#pipeline-configuration)
 - [Code Quality and Coverage](#code-quality-and-coverage)
 - [Security Scanning](#security-scanning)
 - [Artefact Management](#artefact-management)
 - [Container Strategy](#container-strategy)
 - [Observability](#observability)
+  - [Monitoring Stack](#monitoring-stack)
+  - [What Is Monitored](#what-is-monitored)
+  - [Docker Compose Setup](#docker-compose-setup)
+  - [Node Exporter Setup](#node-exporter-setup)
+  - [Boot Persistence](#boot-persistence)
+  - [Grafana Dashboards](#grafana-dashboards)
 - [Email Notifications](#email-notifications)
 - [Learnings and Challenges](#learnings-and-challenges)
 - [References](#references)
@@ -66,7 +71,6 @@ This project was built to demonstrate practical, hands-on DevOps engineering in 
 
 ---
 
-
 ## Pipeline Overview
 
 ![boardgame-pipeline](screenshots/pipeline.png)
@@ -85,16 +89,15 @@ Every stage produces a traceable output — test results, coverage reports, Triv
 
 ---
 
-### Server Layout
+### Server Overview
 
 All servers are provisioned on GCP virtual machines with the following naming convention:
 
-* ![rv](https://img.shields.io/badge/rv-orange?style=flat-square) — Short form for Raven (project tag)  
-* ![gcp](https://img.shields.io/badge/gcp-orange?style=flat-square) — Server location  
-* ![jenk/son/nex/mon/k8](https://img.shields.io/badge/jenk%2Fson%2Fnex%2Fmon%2Fk8-orange?style=flat-square) — Service abbreviation  
-* ![svr](https://img.shields.io/badge/svr-orange?style=flat-square) — Server  
-* ![1/2/3](https://img.shields.io/badge/1%2F2%2F3-orange?style=flat-square) — Node number (for multi-node services)
-
+- ![rv](https://img.shields.io/badge/rv-orange?style=flat-square) — Short form for Raven (project tag)
+- ![gcp](https://img.shields.io/badge/gcp-orange?style=flat-square) — Server location
+- ![jenk/son/nex/mon/k8](https://img.shields.io/badge/jenk%2Fson%2Fnex%2Fmon%2Fk8-orange?style=flat-square) — Service abbreviation
+- ![svr](https://img.shields.io/badge/svr-orange?style=flat-square) — Server
+- ![1/2/3](https://img.shields.io/badge/1%2F2%2F3-orange?style=flat-square) — Node number (for multi-node services)
 
 | Server | Role |
 |---|---|
@@ -105,7 +108,6 @@ All servers are provisioned on GCP virtual machines with the following naming co
 | `rv-gcp-k8-svr2` | Kubernetes worker node |
 | `rv-gcp-k8-svr3` | Kubernetes worker node |
 | `rv-gcp-jenk-svr` | Jenkins controller |
-
 
 ---
 
@@ -138,7 +140,7 @@ volumes:
 
 **SonarQube post-installation steps:**
 
-1. An authentication token was generated for Jenkins user : **My Account → Security → Generate Token**
+1. An authentication token was generated for Jenkins user: **My Account → Security → Generate Token**
 
 ---
 
@@ -161,14 +163,12 @@ volumes:
   nexus-data:
 ```
 
-**Nexus Post-installation steps:**
+**Nexus post-installation steps:**
 
-* Two hosted maven repositories were created in Nexus to store the artefacts
+- Two hosted maven repositories were created in Nexus to store the artefacts
+- A dedicated Jenkins user was created in Nexus with deploy permissions
 
-
-* A dedicated Jenkins user was created in Nexus with deploy permissions.
-
-![Jenskins Nexus User Created](./screenshots/jenkins-nexus-user.png)
+![Jenkins Nexus User Created](screenshots/jenkins-nexus-user.png)
 
 ---
 
@@ -249,6 +249,7 @@ sudo kubeadm join 10.0.1.2:6443 --token <token> \
 ```
 
 ---
+
 #### Kubernetes RBAC for Jenkins
 
 Jenkins deploys using a dedicated service account with **least-privilege** permissions scoped exclusively to the `boardgame` namespace. It cannot affect any other namespace or cluster-level resources.
@@ -320,6 +321,7 @@ kubectl get secret jenkins-deployer-token \
     --namespace boardgame \
     -o jsonpath='{.data.token}' | base64 --decode
 ```
+
 ---
 
 ### Jenkins Server Setup
@@ -380,9 +382,7 @@ sudo apt update && sudo apt-get install -y trivy
 
 > **Jenkins Docker group membership:** The Docker daemon binds to a Unix socket owned by root. Jenkins must be in the `docker` group to send commands to this socket without using sudo.
 
-
 ---
-
 
 ## Jenkins Configuration
 
@@ -419,30 +419,13 @@ Go to **Manage Jenkins → Global Tool Configuration**
 | NodeJS | `nodejs` | 24.x LTS | `tools { nodejs 'nodejs' }` |
 | SonarQube Scanner | `sonar-scanner` | Latest | `SCANNER_HOME = tool 'sonar-scanner'` |
 
-![Tools config](./screenshots/tools-configuration.png)
+![Tools config](screenshots/tools-configuration.png)
 
 > The `tools` block adds the tool's `bin/` directory to `PATH` — enabling `mvn`, `java`, and `node` commands directly. The `tool()` function returns the full installation path — used for SonarQube Scanner which is invoked via `$SCANNER_HOME/bin/sonar-scanner`.
 
 ---
 
-### Credentials
-
-Credentials are required for Jenkins to authenticate with the different servers and services referenced in the pipeline.
-They are configured at **Manage Jenkins → Credentials → Global → Add Credentials**.:
-
-| ID | Kind | Used in pipeline |
-|---|---|---|
-| `docker-cred` | Username with password | `withCredentials` in Build Docker Image stage |
-| `git-cred` | Username with password | GitHun authentication |
-| `k8-cred` | Secret text | `withKubeConfig` in Deploy to Kubernetes stage |
-| `sonar-token` | Secret text | SonarQube server configuration |
-| `mail-cred` | Username with password | Gmail app credentials |
-
-![Credentials](./screenshots/credentials-config.png)
-
----
-
-### System Configuration
+### SonarQube Integration
 
 The SonarQube server must be registered in Jenkins before `withSonarQubeEnv()` can be used in the pipeline. SonarQube must already be running and its token generated before this step.
 
@@ -462,14 +445,27 @@ This is configured at **Manage Jenkins → Configure System**:
 
 > The **Name** field is case sensitive and must match exactly what is passed to `withSonarQubeEnv()` in the Jenkinsfile.
 
+---
 
+### Credentials
+
+Credentials are required for Jenkins to authenticate with the different servers and services referenced in the pipeline. They are configured at **Manage Jenkins → Credentials → Global → Add Credentials**:
+
+| ID | Kind | Used in pipeline |
+|---|---|---|
+| `docker-cred` | Username with password | `withCredentials` in Build Docker Image stage |
+| `git-cred` | Username with password | GitHub authentication |
+| `k8-cred` | Secret text | `withKubeConfig` in Deploy to Kubernetes stage |
+| `sonar-token` | Secret text | SonarQube server configuration |
+| `mail-cred` | Username with password | Gmail app credentials |
+
+![Credentials](screenshots/credentials-config.png)
 
 ---
 
-### Managed Files
+### Nexus Authentication
 
 The **Config File Provider Plugin** manages `settings.xml` inside Jenkins. Maven uses `settings.xml` to store authentication credentials that `pom.xml` cannot hold securely. By managing `settings.xml` through Jenkins, Nexus credentials are kept out of the repository entirely and injected securely at build time.
-
 
 1. Go to **Manage Jenkins → Managed Files → Add a New Config**
 2. Select **Maven settings.xml**
@@ -495,10 +491,9 @@ The **Config File Provider Plugin** manages `settings.xml` inside Jenkins. Maven
 
 The `id` values must match the `<id>` in `pom.xml` `distributionManagement`. The ID is how Maven knows which credentials to use for which Nexus repository.
 
-
 ---
 
-## Jenkinsfile Walkthrough
+## Pipeline Configuration
 
 The pipeline uses **declarative syntax** with a single agent and explicit tool declarations. Each stage has a single, clearly defined responsibility.
 
@@ -697,11 +692,11 @@ This separation is critical. Without it, HTML, CSS and SQL files with no coverag
 
 **Code Quality result from SonarQube**
 
-![Quality result from SonarQube](./screenshots/code-quality-report.png)
+![Quality result from SonarQube](screenshots/code-quality-report.png)
 
 **Test Coverage result from JaCoCo**
 
-![JaCoCo coverage result](./screenshots/jacoco-coverage-report.png)
+![JaCoCo coverage result](screenshots/jacoco-coverage-report.png)
 
 > Security branch coverage is 0% because triggering a real 403 access denied event in tests requires additional MockMvc security configuration beyond the current test suite.
 
@@ -713,13 +708,13 @@ The JaCoCo HTML report is published directly to the Jenkins build page via `publ
 
 Trivy runs at two points in the pipeline:
 
-* **Filesystem scan** : This runs before packaging and it scans the source code and `pom.xml` for known CVEs in declared dependencies. Output saved to `reports/trivy-fs-report.html`.
+- **Filesystem scan** — runs before packaging, scanning the source code and `pom.xml` for known CVEs in declared dependencies. Output saved to `reports/trivy-fs-report.html`.
 
-![Trivy File System Scan Report](./screenshots/trivy-fs-scan-report.png)
+![Trivy File System Scan Report](screenshots/trivy-fs-scan-report.png)
 
-* **Image scan** runs after the Docker image is built, scanning OS packages and library layers for vulnerabilities. This catches issues introduced by the base image that the filesystem scan cannot see. Output saved to `reports/trivy-image-report.html`.
+- **Image scan** — runs after the Docker image is built, scanning OS packages and library layers for vulnerabilities. This catches issues introduced by the base image that the filesystem scan cannot see. Output saved to `reports/trivy-image-report.html`.
 
-![Trivy Image Scan Report](./screenshots/trivy-image-scan-report.png)
+![Trivy Image Scan Report](screenshots/trivy-image-scan-report.png)
 
 Both reports are archived as Jenkins build artefacts and available for download from the build page. The `reports/` directory is explicitly separated from source code to prevent SonarQube from treating Trivy HTML output as analysable source files.
 
@@ -737,7 +732,8 @@ The `-SNAPSHOT` suffix routes to `maven-snapshots`. Removing it and changing to 
 
 The `withMaven()` step with `traceability: true` attaches Jenkins build metadata to the Nexus artefact; build number, Git commit hash, and branch name. This ensures that any artefact in Nexus can be traced back to the exact pipeline run and source commit that produced it.
 
-![Artefact in nexus](./screenshots/artefacts-in-nexus.png)
+![Artefact in Nexus](screenshots/artefacts-in-nexus.png)
+
 ---
 
 ## Container Strategy
@@ -805,22 +801,25 @@ The pipeline is complemented by a monitoring stack that provides observability a
 ### What Is Monitored
 
 1. **Infrastructure — Node Exporter scrapes metrics from Jenkins server:**
+
    - CPU usage per core, memory and swap utilisation
    - Disk read/write throughput and filesystem usage
    - Network bytes in/out per interface
    - System load average and uptime
 
 2. **Application — Blackbox Exporter:**
+
    - BoardGame application uptime on Kubernetes
    - HTTP status code and end-to-end response time
    - HTTP duration breakdown — DNS lookup, TCP connect, processing, transfer
    - SSL certificate validity and expiry (for HTTPS targets)
 
 3. **CI/CD — Jenkins Prometheus plugin monitors the Job:**
+
    - Build queue depth and executor utilisation
    - Build counts and durations exposed at `/prometheus`
 
-### Docker Compose Setup for BlackBox exporter, Prometheus and Grafana
+### Docker Compose Setup
 
 ```yaml
 services:
@@ -859,8 +858,9 @@ volumes:
   grafana-data:
 ```
 
-### Node Exporter Set up Jenkins Host
-Node Exporter runs on the Jenkins server, manage by docker compose with `network_mode: host` and `pid: host` to access real host-level metrics rather than the container's isolated view.
+### Node Exporter Setup
+
+Node Exporter runs on the Jenkins server, managed by Docker Compose with `network_mode: host` and `pid: host` to access real host-level metrics rather than the container's isolated view.
 
 ```yaml
 services:
@@ -881,7 +881,7 @@ services:
 
 Two systemd service units ensure the monitoring stack and the node-exporter services start automatically in the event of server reboot:
 
-**Systemd unit file for monitoring stack on the Monitor Server**
+**Systemd unit file for monitoring stack on the Monitor Server:**
 
 ```ini
 [Unit]
@@ -910,14 +910,12 @@ sudo systemctl start monitoring.service
 ```
 
 **Monitoring service started successfully**
-![project-block-diagram](./screenshots/monitoring-stack.jpg)
 
+![Monitoring stack](screenshots/monitoring-stack.jpg)
 
-
-**Systemd unit file for node-exporter service on Jenkins host**
+**Systemd unit file for node-exporter service on Jenkins host:**
 
 ```ini
-
 [Unit]
 Description=Node Exporter
 Requires=docker.service
@@ -936,7 +934,6 @@ RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
-
 ```
 
 ```bash
@@ -944,19 +941,18 @@ sudo systemctl enable node-exporter.service
 sudo systemctl start node-exporter.service
 ```
 
-
----
-
 ### Grafana Dashboards
 
-_**Jenskins Host Resource Usage**_
+**Jenkins Host Resource Usage**
 
-![Jenskins Host Resource Usage](./screenshots/jenkins-host-dashboard.png)
+![Jenkins Host Resource Usage](screenshots/jenkins-host-dashboard.png)
 
 ---
-_**Live Website Monitor**_
 
-![Live Website Dashboard](./screenshots/website-blackbox-dashboard.png)
+**Live Website Monitor**
+
+![Live Website Dashboard](screenshots/website-blackbox-dashboard.png)
+
 ---
 
 ## Email Notifications
@@ -973,7 +969,7 @@ The pipeline sends an automated HTML email after every build via the **Email Ext
 | SMTP Server | `smtp.gmail.com` |
 | SMTP Port | `465` |
 | Credentials | Your email credentials stored in Jenkins |
-| Use SSL | ✅ Enabled |
+| Use SSL | Enabled |
 
 ### What Each Email Contains
 
