@@ -174,7 +174,7 @@ volumes:
 
 ### Kubernetes Cluster Setup
 
-**Prepare all nodes:**
+#### Prepare all nodes
 
 ```bash
 #!/bin/bash
@@ -249,7 +249,7 @@ sudo kubeadm join 10.0.1.2:6443 --token <token> \
 ```
 
 ---
-## Kubernetes RBAC for Jenkins
+#### Kubernetes RBAC for Jenkins
 
 Jenkins deploys using a dedicated service account with **least-privilege** permissions scoped exclusively to the `boardgame` namespace. It cannot affect any other namespace or cluster-level resources.
 
