@@ -338,7 +338,7 @@ Install via **Manage Jenkins → Plugins → Available plugins**:
 
 To reference tools in a Jenkins pipeline, they must first be configured in Global Tool Configuration. Each tool requires two things — a **type keyword** that identifies the tool category (provided by the plugin that registered it) and a **name** that you assign and reference in the Jenkinsfile.
 
-Go to **Manage Jenkins → Global Tool Configuration**:
+Go to **Manage Jenkins → Global Tool Configuration**
 
 | Tool Type | Name in Jenkins | Version | How referenced in Jenkinsfile |
 |---|---|---|---|
