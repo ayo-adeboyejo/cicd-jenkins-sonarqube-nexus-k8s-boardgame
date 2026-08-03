@@ -50,7 +50,7 @@ A Jenkins CI/CD pipeline built on GCP infrastructure. It covers automated testin
 
 ## Learning Objectives
 
-This project was built to demonstrate practical, hands-on DevOps engineering in the following areas:
+This project was built to demonstrate practical, hands-on DevOps engineering in the following areas::
 
 - Designing a **multi-stage declarative Jenkins pipeline** covering build, test, quality, security, publish and deploy
 - Integrating **SonarQube** for static analysis across Java, HTML and JavaScript with accurate coverage reporting
