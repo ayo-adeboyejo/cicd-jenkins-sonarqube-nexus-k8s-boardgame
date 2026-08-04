@@ -50,7 +50,7 @@ A Jenkins CI/CD pipeline built on GCP infrastructure. It covers automated testin
 
 ## Learning Objectives
 
-This project was built to demonstrate practical, hands-on DevOps engineering in the following areas::
+This project was built to demonstrate practical, hands-on DevOps engineering in the following areas:
 
 - Designing a **multi-stage declarative Jenkins pipeline** covering build, test, quality, security, publish and deploy
 - Integrating **SonarQube** for static analysis across Java, HTML and JavaScript with accurate coverage reporting
@@ -759,27 +759,12 @@ EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-The runtime image contains only what is needed to run the application — the JRE, the JAR, and a non-root user. The JDK, Maven, and source code from the build stage are discarded, minimising the attack surface and reducing the image size significantly.
+The runtime image contains only what is needed to run the application: the JRE, the JAR, and a non-root user. The JDK, Maven, and source code from the build stage are discarded, minimising the attack surface and reducing the image size significantly.
 
-Security is reinforced in the Kubernetes deployment manifest:
-
-```yaml
-securityContext:
-  runAsNonRoot: true
-  allowPrivilegeEscalation: false
-automountServiceAccountToken: false
-resources:
-  requests:
-    memory: "256Mi"
-    cpu: "250m"
-  limits:
-    memory: "512Mi"
-    cpu: "500m"
-```
 
 ---
 
-## Observability
+## Monitoring and Observability
 
 The pipeline is complemented by a monitoring stack that provides observability across three layers: infrastructure health, application uptime, and CI/CD pipeline metrics. All monitoring components run as Docker containers on `rv-gcp-mon-svr`, managed by Docker Compose and configured to start automatically on server boot via a systemd service unit.
 
@@ -813,7 +798,7 @@ The pipeline is complemented by a monitoring stack that provides observability a
    - Build queue depth and executor utilisation
    - Build counts and durations exposed at `/prometheus`
 
-### Docker Compose Setup
+### Docker Compose Setup for Grafana, Prometheus and Blackbox exporter
 
 ```yaml
 services:
@@ -955,38 +940,33 @@ The pipeline sends an automated HTML email after every build via the **Email Ext
 
 ### Prerequisites
 
-1. Install **Email Extension Plugin** via **Manage Jenkins → Plugins**
-2. Configure SMTP in **Manage Jenkins → Configure System → Extended E-mail Notification**:
+1. **Email Extension Plugin** was installed via **Manage Jenkins → Plugins**
+2. SMTP was configured in **Manage Jenkins → Configure System → Extended E-mail Notification**:
 
 | Field | Value |
 |---|---|
 | SMTP Server | `smtp.gmail.com` |
 | SMTP Port | `465` |
-| Credentials | Your email credentials stored in Jenkins |
+| Credentials | Your email app credentials stored in Jenkins |
 | Use SSL | Enabled |
+
+
 
 ### What Each Email Contains
 
-| Section | Content |
-|---|---|
-| Build Summary | Project name, build number, status, duration, Docker image tag, branch |
-| Code Coverage | JaCoCo line coverage percentage — green if ≥ 80%, red if below |
-| Code Quality | Direct links to SonarQube dashboard and quality gate status |
-| Security Scans | Trivy filesystem and image reports attached as HTML files |
-| Quick Links | Jenkins build page, console output, JaCoCo report, SonarQube dashboard |
-| Console Log | Full Jenkins build log attached |
+Email notification 1/2
+![Email notification 1/2](screenshots/email1.png)
 
-### Pipeline Configuration
+Email notification 2/2
+![Email notification 2/2](screenshots/email2.png)
 
-The `emailext` step is placed in the `post { always { } }` block so notifications are sent on every build regardless of result. The Trivy reports are attached using `attachmentsPattern` and JaCoCo coverage is extracted directly from `jacoco.xml` at runtime and injected into the email body with colour-coded thresholds.
 
 ---
 
 ## Learnings and Challenges
+### SonarQube coverage discrepancy — 91% JaCoCo vs 37.9% SonarQube
 
-### Java 25 tool compatibility — Lombok and JaCoCo
-
-The Jenkins server runs Java 25 which is very new. Lombok `1.18.20` threw `ExceptionInInitializerError: com.sun.tools.javac.code.TypeTag::UNKNOWN` at compile time — a known incompatibility caused by changes to internal javac APIs in newer JDK versions. JaCoCo `0.8.7` and `0.8.12` threw `Unsupported class file major version 69` — class file version 69 corresponds to Java 25, which those versions cannot instrument. Both required explicit version upgrades: Lombok to `1.18.44` and JaCoCo to `0.8.14`, the first version with official Java 25 support. The `maven-compiler-plugin` also required upgrading from `3.8.1` to `3.12.0` for correct annotation processing on Java 23 and above. The lesson was that tool compatibility matrices must be verified against the actual runtime Java version before assuming any configuration will work.
+JaCoCo reported 91% line coverage while SonarQube showed 37.9%. Three root causes combined to produce this discrepancy. First, `sonar.jacoco.reportPath` — the property used to configure the coverage report path — was deprecated and removed in SonarQube 9+. The correct property is `sonar.coverage.jacoco.xmlReportPaths` pointing to the XML report rather than the binary `.exec` file. Second, SonarQube was analysing HTML, JavaScript, CSS and SQL files as source. Since no coverage tool instruments these languages, they all showed 0% coverage and were averaged into the overall metric alongside Java. Third, `sonar.exclusions` and `sonar.coverage.exclusions` are entirely different properties — the former excludes files from analysis entirely, the latter only from the coverage calculation. The fix was setting `sonar.sources=src/main/java,src/main/resources` to analyse all files for quality while setting `sonar.coverage.exclusions=src/main/resources/**` to restrict coverage measurement to Java only.
 
 ### Calico CNI v3.27.2 ARM64 crash
 
@@ -994,9 +974,6 @@ The Jenkins server runs Java 25 which is very new. Lombok `1.18.20` threw `Excep
 
 After deploying the Kubernetes cluster, all three Calico node pods entered `CrashLoopBackOff` across all nodes simultaneously. The `mount-bpffs` init container was failing — Calico v3.27.2 has a known bug where the BPF filesystem mount fails on ARM64 nodes. This is not a configuration error and cannot be fixed by adjusting YAML. The only resolution was to delete the broken Calico installation and reinstall with v3.27.0, which does not have this bug. Without a working CNI, no pods can start anywhere in the cluster because Kubernetes cannot assign IP addresses to them.
 
-### SonarQube coverage discrepancy — 91% JaCoCo vs 37.9% SonarQube
-
-JaCoCo reported 91% line coverage while SonarQube showed 37.9%. Three root causes combined to produce this discrepancy. First, `sonar.jacoco.reportPath` — the property used to configure the coverage report path — was deprecated and removed in SonarQube 9+. The correct property is `sonar.coverage.jacoco.xmlReportPaths` pointing to the XML report rather than the binary `.exec` file. Second, SonarQube was analysing HTML, JavaScript, CSS and SQL files as source. Since no coverage tool instruments these languages, they all showed 0% coverage and were averaged into the overall metric alongside Java. Third, `sonar.exclusions` and `sonar.coverage.exclusions` are entirely different properties — the former excludes files from analysis entirely, the latter only from the coverage calculation. The fix was setting `sonar.sources=src/main/java,src/main/resources` to analyse all files for quality while setting `sonar.coverage.exclusions=src/main/resources/**` to restrict coverage measurement to Java only.
 
 ### Grafana variable parsing — `$variable` vs `${variable}`
 
