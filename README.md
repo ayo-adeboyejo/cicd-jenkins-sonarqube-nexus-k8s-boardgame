@@ -11,7 +11,7 @@
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-6DB33F?style=for-the-badge&logo=spring-boot&logoColor=white)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
-A Jenkins CI/CD pipeline built on GCP infrastructure. It covers automated testing, static code analysis, security scanning, artefact management, containerisation, Kubernetes deployment and full-stack observability.
+A Jenkins CI/CD pipeline built on GCP infrastructure. It covers automated testing, static code analysis, security scanning, artefact management, containerisation, Kubernetes deployment and observability.
 
 ![project-block-diagram](screenshots/project-block-diagram.png)
 
@@ -23,7 +23,7 @@ A Jenkins CI/CD pipeline built on GCP infrastructure. It covers automated testin
 - [Pipeline Overview](#pipeline-overview)
 - [Infrastructure Setup](#infrastructure-setup)
   - [GCP Networking](#gcp-networking)
-  - [Server Overview](#server-overview)
+  - [Server Overview and Naming Convention](#server-overview-and-naming-convention)
   - [SonarQube Server Setup](#sonarqube-server-setup)
   - [Nexus Repository Setup](#nexus-repository-setup)
   - [Kubernetes Cluster Setup](#kubernetes-cluster-setup)
@@ -52,7 +52,7 @@ A Jenkins CI/CD pipeline built on GCP infrastructure. It covers automated testin
 
 This project was built to demonstrate practical, hands-on DevOps engineering in the following areas:
 
-- Designing a **multi-stage declarative Jenkins pipeline** covering build, test, quality, security, publish and deploy
+- Designing a **multi-stage declarative Jenkins pipeline** covering build, test, quality, security, publish, deploy and notification.
 - Integrating **SonarQube** for static analysis across Java, HTML and JavaScript with accurate coverage reporting
 - Configuring **JaCoCo** for Java test coverage and correctly surfacing it in SonarQube
 - Publishing build artefacts to **Nexus Repository Manager** using Maven deployment with credential injection
@@ -71,7 +71,7 @@ This project was built to demonstrate practical, hands-on DevOps engineering in 
 
 The pipeline implements a **shift-left** approach — catching bugs, vulnerabilities, and quality issues as early as possible in the delivery process, long before code reaches production. Security scanning runs on both the filesystem before packaging and on the Docker image after building. Quality gates block promotion if standards are not met.
 
-Every stage produces a traceable output — test results, coverage reports, Trivy HTML reports, SonarQube analysis, a versioned JAR in Nexus, and a tagged Docker image — giving complete visibility into what was built, how it performed, and what was deployed.
+Every stage produces a traceable output: test results, coverage reports, Trivy HTML reports, SonarQube analysis, a versioned JAR in Nexus, and a tagged Docker image. This gives a complete visibility into what was built, how it performed, and what was deployed.
 
 ---
 
@@ -83,7 +83,7 @@ Every stage produces a traceable output — test results, coverage reports, Triv
 
 ---
 
-### Server Overview
+### Server Overview and Naming Convention
 
 All servers are provisioned on GCP virtual machines with the following naming convention:
 
@@ -101,13 +101,13 @@ All servers are provisioned on GCP virtual machines with the following naming co
 | `rv-gcp-k8-svr1` | Kubernetes master node |
 | `rv-gcp-k8-svr2` | Kubernetes worker node |
 | `rv-gcp-k8-svr3` | Kubernetes worker node |
-| `rv-gcp-jenk-svr` | Jenkins controller |
+| `rv-gcp-jenk-svr` | Jenkins controller |  
 
 ---
 
 ### SonarQube Server Setup
 
-SonarQube runs as a Docker container managed by Docker Compose. Docker must be installed on the server before running the Compose file below:
+SonarQube runs as a Docker container managed by Docker Compose. Docker was installed on the server before running the Compose file below:
 
 ```yaml
 services:
@@ -132,15 +132,15 @@ volumes:
   sonarqube_logs:
 ```
 
-**SonarQube post-installation steps:**
+**SonarQube post-installation step:**
 
-1. An authentication token was generated for Jenkins user: **My Account → Security → Generate Token**
+An authentication token was generated for Jenkins user on the SonarQube server: **My Account → Security → Generate Token**
 
 ---
 
 ### Nexus Repository Setup
 
-Nexus runs as a Docker container managed by Docker Compose. Docker must be installed on the server before running the Compose file below:
+Nexus runs as a Docker container managed by Docker Compose. Docker was installed on the server before running the Compose file below:
 
 ```yaml
 services:
@@ -160,7 +160,7 @@ volumes:
 **Nexus post-installation steps:**
 
 - Two hosted maven repositories were created in Nexus to store the artefacts
-- A dedicated Jenkins user was created in Nexus with deploy permissions
+- A dedicated Jenkins user was created in Nexus with deploy permissions as shown below.
 
 ![Jenkins Nexus User Created](screenshots/jenkins-nexus-user.png)
 
@@ -169,6 +169,8 @@ volumes:
 ### Kubernetes Cluster Setup
 
 #### Prepare all nodes
+
+The following script was used to disable swap, load required kernel modules and system parameters, enable Ip forwarding and install and configure container runtime, kubeadm, kubectl and kubeplet on all the nodes in the cluster.
 
 ```bash
 #!/bin/bash
@@ -230,8 +232,7 @@ mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 
-# Install Calico CNI — must be v3.27.0, NOT v3.27.2
-# v3.27.2 has a known mount-bpffs crash on ARM64
+# Install Calico CNI
 kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
 ```
 
@@ -246,21 +247,27 @@ sudo kubeadm join 10.0.1.2:6443 --token <token> \
 
 #### Kubernetes RBAC for Jenkins
 
-Jenkins deploys using a dedicated service account with **least-privilege** permissions scoped exclusively to the `boardgame` namespace. It cannot affect any other namespace or cluster-level resources.
+In this project, Jenkins was configured to deploy to kubernetes using a dedicated service account with **least-privilege** permissions that was scoped exclusively to the `boardgame` namespace using the yaml manifest below.
 
 ```yaml
-# jenkins-rbac.yaml
+
+# create a namespace 
 apiVersion: v1
 kind: Namespace
 metadata:
   name: boardgame
+
 ---
+
+# create a service account 
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: jenkins
   namespace: boardgame
 ---
+
+# create a role with permissions
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -278,6 +285,8 @@ rules:
     resources: ["ingresses"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
+
+# create a role binding that links the service account to the role
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -297,8 +306,8 @@ roleRef:
 # Apply RBAC manifest
 kubectl apply -f jenkins-rbac.yaml
 
-# Create long-lived token for the service account
-# (Kubernetes 1.24+ no longer auto-generates tokens)
+# Create a token for the service account
+
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
@@ -415,7 +424,7 @@ Go to **Manage Jenkins → Global Tool Configuration**
 
 ![Tools config](screenshots/tools-configuration.png)
 
-> The `tools` block adds the tool's `bin/` directory to `PATH` — enabling `mvn`, `java`, and `node` commands directly. The `tool()` function returns the full installation path — used for SonarQube Scanner which is invoked via `$SCANNER_HOME/bin/sonar-scanner`.
+> The `tools` block adds the tool's `bin/` directory to `PATH`. This enables `mvn`, `java`, and `node` commands to run with specifying their absolute path. The `tool()` function returns the full installation path. Used for SonarQube Scanner which is invoked via `$SCANNER_HOME/bin/sonar-scanner`.
 
 ---
 
@@ -425,9 +434,9 @@ The SonarQube server must be registered in Jenkins before `withSonarQubeEnv()` c
 
 This is configured at **Manage Jenkins → Configure System**:
 
-1. Scroll to the **SonarQube servers** section
-2. Check **Environment variables** — enables `withSonarQubeEnv()` in the pipeline
-3. Click **Add SonarQube** and fill in:
+- Scroll to the **SonarQube servers** section
+- Check **Environment variables** — enables `withSonarQubeEnv()` in the pipeline
+- Click **Add SonarQube** and fill in:
 
 | Field | Value |
 |---|---|
@@ -435,7 +444,7 @@ This is configured at **Manage Jenkins → Configure System**:
 | Server URL | `http://<sonarqube-server-ip>:9000` |
 | Server authentication token | Select the `sonar-token` credential created earlier |
 
-4. Click **Save**
+- Click **Save**
 
 > The **Name** field is case sensitive and must match exactly what is passed to `withSonarQubeEnv()` in the Jenkinsfile.
 
@@ -461,10 +470,10 @@ Credentials are required for Jenkins to authenticate with the different servers 
 
 The **Config File Provider Plugin** manages `settings.xml` inside Jenkins. Maven uses `settings.xml` to store authentication credentials that `pom.xml` cannot hold securely. By managing `settings.xml` through Jenkins, Nexus credentials are kept out of the repository entirely and injected securely at build time.
 
-1. Go to **Manage Jenkins → Managed Files → Add a New Config**
-2. Select **Maven settings.xml**
-3. Set ID: `global-settings`
-4. Add server credentials:
+- Go to **Manage Jenkins → Managed Files → Add a New Config**
+- Select **Maven settings.xml**
+- Set ID: `global-settings`
+- Add server credentials as shown below
 
 ```xml
 <settings>
@@ -483,7 +492,7 @@ The **Config File Provider Plugin** manages `settings.xml` inside Jenkins. Maven
 </settings>
 ```
 
-The `id` values must match the `<id>` in `pom.xml` `distributionManagement`. The ID is how Maven knows which credentials to use for which Nexus repository.
+The `id` values must match the `<id>` in `pom.xml` `distributionManagement`. The ID tells Maven knows which credentials to use for which Nexus repository.
 
 ---
 
@@ -527,7 +536,6 @@ pipeline {
         stage('Test') {
             steps {
                 // JaCoCo agent attaches automatically via prepare-agent goal
-                // configured in pom.xml — no explicit flag needed here
                 sh 'mvn test'
             }
         }
@@ -557,7 +565,7 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonarqube') {
                     sh '''
-                        $SCANNER_HOME/bin/sonar-scanner \
+                            $SCANNER_HOME/bin/sonar-scanner \
                             -Dsonar.projectName=BoardGame \
                             -Dsonar.projectKey=BoardGame \
                             -Dsonar.sources=src/main/java,src/main/resources \
