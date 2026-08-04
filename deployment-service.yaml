@@ -13,8 +13,6 @@ spec:
       labels:
         app: boardgame
     spec:
-      # Disable automounting of service account token — fixes SonarQube
-      # security warning about automounted service account credentials
       automountServiceAccountToken: false
       containers:
         - name: boardgame
@@ -22,18 +20,14 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
-          # Resource requests and limits — fixes SonarQube reliability warnings
-          # requests: guaranteed minimum resources scheduled on the node
-          # limits: maximum resources the container can use
           resources:
             requests:
-              memory: "256Mi"   # minimum memory guaranteed
-              cpu: "250m"       # minimum 0.25 CPU core guaranteed
-              ephemeral-storage: "500Mi"  # minimum storage guaranteed
+              memory: "256Mi"  
+              cpu: "250m"       
+              ephemeral-storage: "500Mi" 
             limits:
-              memory: "512Mi"   # container will be OOM killed if exceeded
-              cpu: "500m"       # container will be throttled if exceeded
-          # Security context — runs container as non-root matching Dockerfile USER
+              memory: "512Mi"  
+              cpu: "500m"       
           securityContext:
             runAsNonRoot: true
             allowPrivilegeEscalation: false
